@@ -1,0 +1,8 @@
+{
+  "name": "Constance",
+  "description": "A real-time bilingual interpreter (English/Russian) with integrated dictionary and transcript management.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": []
+}

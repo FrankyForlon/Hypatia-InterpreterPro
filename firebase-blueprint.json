@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "Session": {
+      "title": "Interpretation Session",
+      "description": "A shared session for English-Russian interpretation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "createdAt", "createdBy"]
+    },
+    "Message": {
+      "title": "Interpreted Message",
+      "description": "A single spoken and translated segment within a session.",
+      "type": "object",
+      "properties": {
+        "en": { "type": "string" },
+        "ru": { "type": "string" },
+        "sourceLang": { "type": "string", "enum": ["en", "ru"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" }
+      },
+      "required": ["en", "ru", "sourceLang", "timestamp", "userId"]
+    }
+  },
+  "firestore": {
+    "/sessions/{sessionId}": {
+      "schema": "Session",
+      "description": "A collection of shared interpretation sessions."
+    },
+    "/sessions/{sessionId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages within a specific session."
+    }
+  }
+}

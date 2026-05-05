@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    function isValidSession(data) {
+      return data.keys().hasAll(['id', 'createdAt', 'createdBy', 'name'])
+             && data.keys().size() == 4
+             && data.id is string
+             && data.createdBy == request.auth.uid;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['en', 'ru', 'sourceLang', 'timestamp', 'userId', 'userName'])
+             && data.keys().size() == 6
+             && data.en is string && data.en.size() <= 5000
+             && data.ru is string && data.ru.size() <= 5000
+             && data.sourceLang in ['en', 'ru']
+             && data.userId == request.auth.uid;
+    }
+
+    // Sessions
+    match /sessions/{sessionId} {
+      allow get: if isSignedIn();
+      allow list: if false; // No blanket listing
+      allow create: if isSignedIn() && isValidSession(request.resource.data) && isValidId(sessionId);
+      allow update: if isSignedIn() && request.auth.uid == resource.data.createdBy && isValidSession(request.resource.data);
+      
+      // Messages Subcollection
+      match /messages/{messageId} {
+        allow list, get: if isSignedIn();
+        allow create: if isSignedIn() && isValidMessage(request.resource.data) && isValidId(messageId);
+        allow update: if isSignedIn() && request.auth.uid == resource.data.userId 
+                      && request.resource.data.userId == resource.data.userId
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['en', 'ru']);
+        allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+      }
+    }
+  }
+}
