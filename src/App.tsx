@@ -46,6 +46,7 @@ interface DictionaryEntry {
 // --- MAIN APP ---
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [authLoaded, setAuthLoaded] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -71,18 +72,26 @@ export default function App() {
     const id = params.get('session');
     if (id) setSessionId(id);
 
-    return onAuthStateChanged(auth, (u) => setUser(u));
+    return onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthLoaded(true);
+    });
   }, []);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !user) return;
     const q = query(collection(db, 'sessions', sessionId, 'messages'), orderBy('timestamp', 'asc'));
     return onSnapshot(q, (snapshot) => {
       const msgs: Message[] = [];
       snapshot.forEach((doc) => msgs.push({ id: doc.id, ...doc.data() } as Message));
       setMessages(msgs);
+    }, (err) => {
+      console.error("Firestore snapshot error:", err);
+      if (err.message.includes('permission')) {
+        setError("Missing permissions. Make sure you're logged in.");
+      }
     });
-  }, [sessionId]);
+  }, [sessionId, user]);
 
   const login = async () => {
     try {
@@ -101,7 +110,7 @@ export default function App() {
 
     const id = Math.random().toString(36).substring(2, 10);
     const ref = doc(db, 'sessions', id);
-    await setDoc(ref, { id, createdAt: serverTimestamp(), createdBy: currentUser.uid });
+    await setDoc(ref, { id, createdAt: serverTimestamp(), createdBy: currentUser.uid, name: `Session ${id}` });
     
     const url = new URL(window.location.href);
     url.searchParams.set('session', id);
@@ -209,8 +218,8 @@ export default function App() {
       const data = JSON.parse(result.text || "{}");
       
       await addDoc(collection(db, 'sessions', sessionId, 'messages'), {
-        en: source === 'en' ? data.originalCleaned : data.translated,
-        ru: source === 'ru' ? data.originalCleaned : data.translated,
+        en: (source === 'en' ? data.originalCleaned : data.translated) || "",
+        ru: (source === 'ru' ? data.originalCleaned : data.translated) || "",
         sourceLang: source,
         timestamp: serverTimestamp(),
         userId: user.uid,
@@ -312,6 +321,24 @@ export default function App() {
                 className="w-full py-4 bg-white text-black font-black uppercase text-xs rounded-2xl tracking-widest hover:bg-amber-400 transition-colors"
               >
                 {isLoading ? 'INITIATING...' : 'New Session'}
+              </button>
+            </div>
+          </div>
+        ) : !authLoaded ? (
+          <div className="absolute inset-0 z-40 bg-black flex items-center justify-center">
+            <div className="text-zinc-500 text-xs font-mono tracking-widest uppercase animate-pulse">Initializing Secure Connection...</div>
+          </div>
+        ) : !user ? (
+          <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-xl flex items-center justify-center p-8">
+            <div className="max-w-xs w-full text-center space-y-6">
+              <LogIn className="mx-auto text-amber-500" size={48} />
+              <h2 className="text-2xl font-serif italic font-light">Join Session</h2>
+              <p className="text-zinc-500 text-[11px] leading-relaxed">Please authenticate to join this secure medical session.</p>
+              <button 
+                onClick={login} 
+                className="w-full py-4 bg-white text-black font-black uppercase text-xs rounded-2xl tracking-widest hover:bg-amber-400 transition-colors"
+              >
+                Sign In to Join
               </button>
             </div>
           </div>
